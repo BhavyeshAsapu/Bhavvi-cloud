@@ -1,0 +1,86 @@
+# Day 4 — Server Structure
+
+## Goal
+
+Create a clean and organized directory structure for the Raspberry Pi server.
+
+## What I did
+
+* Created `/srv/apps` for applications
+* Created `/srv/data` for persistent application data
+* Created `/srv/backups` for backups
+* Created `/srv/docker` for Docker-related resources
+* Created `/srv/config` for configuration files
+* Created `/srv/logs` for logs
+* Verified the directory structure
+
+## Server Directory Structure
+
+```text
+/srv/
+├── apps/
+├── backups/
+├── config/
+├── data/
+├── docker/
+└── logs/
+```
+
+## Commands learned
+
+```bash
+mkdir
+mkdir -p
+ls
+ls -la
+```
+
+## Commands used
+
+Create all directories:
+
+```bash
+sudo mkdir -p /srv/{apps,data,backups,docker,config,logs}
+```
+
+Verify:
+
+```bash
+ls -la /srv
+```
+
+## Directory Purpose
+
+### `/srv/apps`
+
+Contains application source code and deployed server applications.
+
+### `/srv/data`
+
+Contains persistent application and service data.
+
+### `/srv/backups`
+
+Contains backups of important server data and configuration.
+
+### `/srv/docker`
+
+Contains Docker-related configuration, Compose files, and Docker service resources.
+
+### `/srv/config`
+
+Contains configuration files for services and applications.
+
+### `/srv/logs`
+
+Contains application and service logs.
+
+## Why this structure
+
+The `/srv` structure separates applications, persistent data, configuration, backups, Docker resources, and logs.
+
+This makes the server easier to maintain, back up, troubleshoot, and expand as more services are deployed.
+
+## Result
+
+The Raspberry Pi now has a structured server filesystem ready for future applications and services.

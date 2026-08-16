@@ -1,0 +1,509 @@
+# Day 6 — Server Security
+
+## Goal
+
+Harden the Raspberry Pi server by configuring a firewall, auditing open ports and services, enabling automatic security updates, securing SSH, and establishing a non-root administration workflow.
+
+## What I did
+
+* Identified the operating system and kernel
+* Verified the normal administration user
+* Audited listening network ports
+* Audited enabled and running services
+* Installed and configured UFW
+* Denied incoming connections by default
+* Allowed outgoing connections by default
+* Allowed SSH through the firewall
+* Enabled UFW
+* Verified firewall status
+* Verified open ports after enabling the firewall
+* Installed `unattended-upgrades`
+* Verified automatic package-list updates
+* Verified automatic unattended upgrades
+* Verified Debian security repositories
+* Disabled automatic reboot after updates
+* Audited potentially unnecessary services
+* Retained required services for the current server setup
+* Hardened SSH authentication
+* Disabled root SSH login
+* Disabled password authentication
+* Enabled public-key SSH authentication
+* Verified SSH configuration syntax
+* Reloaded SSH safely
+* Tested SSH access from the Mac after hardening
+* Confirmed `.local` SSH access through Avahi
+
+## Operating System
+
+Checked the operating system:
+
+```bash
+cat /etc/os-release
+```
+
+System:
+
+```text
+Debian GNU/Linux 13 (trixie)
+Debian version 13.5
+```
+
+Kernel:
+
+```bash
+uname -a
+```
+
+Architecture:
+
+```text
+aarch64
+```
+
+## Administration User
+
+Checked the current user:
+
+```bash
+whoami
+```
+
+Result:
+
+```text
+bhavyesh_bhavvi
+```
+
+Checked user privileges:
+
+```bash
+id
+```
+
+The user belongs to the `sudo` group.
+
+The administration workflow is:
+
+```text
+SSH
+ ↓
+bhavyesh_bhavvi
+ ↓
+sudo <command>
+ ↓
+Root privileges only when required
+```
+
+Direct root SSH login is disabled.
+
+## Open Port Audit
+
+Checked listening ports:
+
+```bash
+sudo ss -tulpn
+```
+
+The main TCP listening service was:
+
+```text
+TCP 22 → sshd
+```
+
+UDP ports were associated with:
+
+```text
+avahi-daemon
+```
+
+Avahi uses UDP port 5353 for mDNS.
+
+## SSH
+
+SSH is running on:
+
+```text
+Port 22
+```
+
+Verified SSH configuration:
+
+```bash
+sudo sshd -T | grep -E '^(port|listenaddress|permitrootlogin|passwordauthentication|pubkeyauthentication|kbdinteractiveauthentication)'
+```
+
+Initial configuration included:
+
+```text
+port 22
+listenaddress [::]:22
+listenaddress 0.0.0.0:22
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+```
+
+## Firewall
+
+UFW was initially not installed.
+
+Installed it using:
+
+```bash
+sudo apt update
+sudo apt install ufw
+```
+
+Configured the default incoming policy:
+
+```bash
+sudo ufw default deny incoming
+```
+
+Configured outgoing traffic:
+
+```bash
+sudo ufw default allow outgoing
+```
+
+Allowed SSH:
+
+```bash
+sudo ufw allow 22/tcp
+```
+
+Enabled the firewall:
+
+```bash
+sudo ufw enable
+```
+
+Verified:
+
+```bash
+sudo ufw status verbose
+```
+
+Final firewall configuration:
+
+```text
+Status: active
+Logging: on (low)
+Default: deny (incoming)
+Default: allow (outgoing)
+```
+
+SSH:
+
+```text
+22/tcp ALLOW IN Anywhere
+22/tcp ALLOW IN Anywhere (v6)
+```
+
+## Open Port Verification
+
+After enabling UFW:
+
+```bash
+sudo ss -lntup
+```
+
+SSH remained available:
+
+```text
+0.0.0.0:22
+[::]:22
+```
+
+This confirmed that enabling the firewall did not interrupt SSH access.
+
+## Service Audit
+
+Audited enabled services:
+
+```bash
+systemctl list-unit-files --type=service --state=enabled
+```
+
+Audited running services:
+
+```bash
+systemctl --type=service --state=running
+```
+
+Important services intentionally retained:
+
+```text
+ssh.service
+NetworkManager.service
+wpa_supplicant.service
+avahi-daemon.service
+kl-sophos.service
+klef-auth.service
+systemd-timesyncd.service
+udisks2.service
+```
+
+### Avahi
+
+Avahi was intentionally retained because the Pi is accessed using:
+
+```bash
+ssh bhavyesh_bhavvi@bhavyesh.local
+```
+
+The `.local` hostname uses mDNS.
+
+Avahi is listening on UDP 5353.
+
+Therefore, disabling Avahi would interfere with the current `.local` hostname workflow.
+
+### KLEF Services
+
+These services were retained because they are part of the current KLEF Wi-Fi and captive-portal automation:
+
+```text
+kl-sophos.service
+klef-auth.service
+```
+
+### Serial Console
+
+Investigated:
+
+```text
+serial-getty@ttyAMA10.service
+```
+
+The kernel command line contains:
+
+```text
+console=ttyAMA10,115200
+```
+
+and:
+
+```text
+/dev/serial0 -> ttyAMA10
+```
+
+The serial console was therefore intentionally retained for possible low-level recovery and debugging.
+
+### Cloud-init
+
+Cloud-init was also retained.
+
+Checked:
+
+```bash
+cloud-init status --long
+```
+
+Result:
+
+```text
+status: done
+errors: []
+```
+
+There was a recoverable warning regarding:
+
+```text
+cc_netplan_nm_patch
+```
+
+but cloud-init completed successfully, so it was not disabled.
+
+## Automatic Security Updates
+
+Installed:
+
+```bash
+sudo apt install unattended-upgrades
+```
+
+Verified:
+
+```bash
+apt-config dump | grep -E 'APT::Periodic::(Update-Package-Lists|Unattended-Upgrade)'
+```
+
+Configuration:
+
+```text
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+```
+
+This means:
+
+```text
+Package list updates → daily
+Unattended upgrades  → daily
+```
+
+Verified:
+
+```bash
+cat /etc/apt/apt.conf.d/20auto-upgrades
+```
+
+Security repositories configured in:
+
+```text
+/etc/apt/apt.conf.d/50unattended-upgrades
+```
+
+include Debian and Debian Security repositories.
+
+Verified timers:
+
+```bash
+systemctl list-timers --all | grep -E 'apt|unattended'
+```
+
+Active timers:
+
+```text
+apt-daily.timer
+apt-daily-upgrade.timer
+```
+
+Automatic reboot was not enabled.
+
+This prevents the Raspberry Pi from unexpectedly rebooting after an update.
+
+## SSH Hardening
+
+Created:
+
+```text
+/etc/ssh/sshd_config.d/99-hardening.conf
+```
+
+Configuration:
+
+```text
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+```
+
+Validated the configuration:
+
+```bash
+sudo sshd -t
+```
+
+No errors were returned.
+
+Verified effective settings:
+
+```bash
+sudo sshd -T | grep -E '^(permitrootlogin|passwordauthentication|pubkeyauthentication|kbdinteractiveauthentication)'
+```
+
+Final configuration:
+
+```text
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+```
+
+Reloaded SSH:
+
+```bash
+sudo systemctl reload ssh
+```
+
+Verified SSH remained active:
+
+```bash
+sudo systemctl status ssh --no-pager
+```
+
+## SSH Verification
+
+From the Mac, tested:
+
+```bash
+ssh bhavyesh_bhavvi@bhavyesh.local
+```
+
+The connection succeeded.
+
+This confirmed:
+
+* Avahi/mDNS hostname resolution works
+* SSH port 22 remains accessible
+* Public-key authentication works
+* Password authentication is disabled
+* Root SSH login is disabled
+* Non-root administration works
+
+## Final Security Configuration
+
+```text
+Firewall
+├── Incoming: DENY
+├── Outgoing: ALLOW
+└── SSH 22/tcp: ALLOW
+
+SSH
+├── Port: 22
+├── Root login: DISABLED
+├── Password authentication: DISABLED
+├── Public-key authentication: ENABLED
+└── Keyboard-interactive authentication: DISABLED
+
+Automatic Updates
+├── Package lists: DAILY
+├── Security upgrades: DAILY
+└── Automatic reboot: DISABLED
+
+Administration
+├── Normal user: bhavyesh_bhavvi
+├── Root SSH login: DISABLED
+└── Administrative access: sudo
+```
+
+## Commands learned
+
+```bash
+ss
+ufw
+systemctl
+systemctl status
+systemctl reload
+systemctl list-unit-files
+systemctl list-timers
+sshd
+sshd -t
+sshd -T
+grep
+apt-config
+dpkg
+cloud-init
+```
+
+## Result
+
+The Raspberry Pi now has a basic server security baseline:
+
+* Firewall enabled
+* Incoming connections denied by default
+* SSH explicitly allowed
+* SSH password authentication disabled
+* Root SSH login disabled
+* Public-key SSH authentication enabled
+* Automatic security updates enabled
+* Non-root administration with `sudo`
+* Open ports and services audited
+* Required services intentionally retained
+* SSH access verified after security hardening
+* `.local` SSH access through Avahi preserved
+
+The system is now ready for future server services while maintaining a controlled security baseline.
